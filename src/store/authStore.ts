@@ -16,7 +16,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialized: false,
 
   initialize: () => {
+    // Safety net: if auth doesn't resolve in 5s, unblock the UI
+    const timeout = setTimeout(() => {
+      set((s) => s.initialized ? s : { ...s, user: null, initialized: true })
+    }, 5000)
+
     supabase.auth.onAuthStateChange(async (_event, session) => {
+      clearTimeout(timeout)
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')

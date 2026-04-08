@@ -69,7 +69,8 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   addFolder: async (name, color, coverImageUrl) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const { data, error } = await supabase
@@ -113,7 +114,8 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   addMemory: async (folderId, title, date, notes, imageUrls) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
     if (!user) return
 
     const { data, error } = await supabase
