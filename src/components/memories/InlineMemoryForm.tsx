@@ -40,13 +40,18 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
-    if (memory) {
-      await updateMemory(memory.id, title.trim(), date, notes.trim(), images)
-    } else {
-      await addMemory(folderId, title.trim(), date, notes.trim(), images)
+    try {
+      if (memory) {
+        await updateMemory(memory.id, title.trim(), date, notes.trim(), images)
+      } else {
+        await addMemory(folderId, title.trim(), date, notes.trim(), images)
+      }
+      onDone()
+    } catch (err) {
+      console.error('Failed to save memory:', err)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    onDone()
   }
 
   return (

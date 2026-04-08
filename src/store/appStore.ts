@@ -54,100 +54,134 @@ export const useAppStore = create<AppState>((set) => ({
   selectFolder: (id) => set({ selectedFolderId: id }),
 
   loadData: async (userId) => {
-    const [foldersRes, memoriesRes] = await Promise.all([
-      supabase.from('folders').select('*').eq('user_id', userId).order('created_at'),
-      supabase.from('memories').select('*').eq('user_id', userId).order('created_at'),
-    ])
+    try {
+      const [foldersRes, memoriesRes] = await Promise.all([
+        supabase.from('folders').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('memories').select('*').eq('user_id', userId).order('created_at'),
+      ])
 
-    const folders = (foldersRes.data ?? []).map(mapFolder)
-    const memories = (memoriesRes.data ?? []).map(mapMemory)
-    set({
-      folders,
-      memories,
-      selectedFolderId: folders[0]?.id ?? null,
-    })
+      const folders = (foldersRes.data ?? []).map(mapFolder)
+      const memories = (memoriesRes.data ?? []).map(mapMemory)
+      set({
+        folders,
+        memories,
+        selectedFolderId: folders[0]?.id ?? null,
+      })
+    } catch (err) {
+      console.error('Failed to load data:', err)
+    }
   },
 
   addFolder: async (name, color, coverImageUrl) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-    if (!user) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return
 
-    const { data, error } = await supabase
-      .from('folders')
-      .insert({ user_id: user.id, name, color, cover_image_url: coverImageUrl ?? null })
-      .select()
-      .single()
+      const { data, error } = await supabase
+        .from('folders')
+        .insert({ user_id: user.id, name, color, cover_image_url: coverImageUrl ?? null })
+        .select()
+        .single()
 
-    if (data && !error) {
-      const folder = mapFolder(data)
-      set((s) => ({ folders: [...s.folders, folder], selectedFolderId: folder.id }))
+      if (error) console.error('Failed to add folder:', error)
+      if (data && !error) {
+        const folder = mapFolder(data)
+        set((s) => ({ folders: [...s.folders, folder], selectedFolderId: folder.id }))
+      }
+    } catch (err) {
+      console.error('Failed to add folder:', err)
     }
   },
 
   updateFolder: async (id, name, color, coverImageUrl) => {
-    const { data, error } = await supabase
-      .from('folders')
-      .update({ name, color, cover_image_url: coverImageUrl ?? null })
-      .eq('id', id)
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('folders')
+        .update({ name, color, cover_image_url: coverImageUrl ?? null })
+        .eq('id', id)
+        .select()
+        .single()
 
-    if (data && !error) {
-      set((s) => ({
-        folders: s.folders.map((f) => (f.id === id ? mapFolder(data) : f)),
-      }))
+      if (error) console.error('Failed to update folder:', error)
+      if (data && !error) {
+        set((s) => ({
+          folders: s.folders.map((f) => (f.id === id ? mapFolder(data) : f)),
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to update folder:', err)
     }
   },
 
   deleteFolder: async (id) => {
-    const { error } = await supabase.from('folders').delete().eq('id', id)
-    if (!error) {
-      set((s) => {
-        const folders = s.folders.filter((f) => f.id !== id)
-        const memories = s.memories.filter((m) => m.folderId !== id)
-        const selectedFolderId =
-          s.selectedFolderId === id ? (folders[0]?.id ?? null) : s.selectedFolderId
-        return { folders, memories, selectedFolderId }
-      })
+    try {
+      const { error } = await supabase.from('folders').delete().eq('id', id)
+      if (error) console.error('Failed to delete folder:', error)
+      if (!error) {
+        set((s) => {
+          const folders = s.folders.filter((f) => f.id !== id)
+          const memories = s.memories.filter((m) => m.folderId !== id)
+          const selectedFolderId =
+            s.selectedFolderId === id ? (folders[0]?.id ?? null) : s.selectedFolderId
+          return { folders, memories, selectedFolderId }
+        })
+      }
+    } catch (err) {
+      console.error('Failed to delete folder:', err)
     }
   },
 
   addMemory: async (folderId, title, date, notes, imageUrls) => {
-    const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
-    if (!user) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return
 
-    const { data, error } = await supabase
-      .from('memories')
-      .insert({ user_id: user.id, folder_id: folderId, title, date, notes, image_urls: imageUrls })
-      .select()
-      .single()
+      const { data, error } = await supabase
+        .from('memories')
+        .insert({ user_id: user.id, folder_id: folderId, title, date, notes, image_urls: imageUrls })
+        .select()
+        .single()
 
-    if (data && !error) {
-      set((s) => ({ memories: [...s.memories, mapMemory(data)] }))
+      if (error) console.error('Failed to add memory:', error)
+      if (data && !error) {
+        set((s) => ({ memories: [...s.memories, mapMemory(data)] }))
+      }
+    } catch (err) {
+      console.error('Failed to add memory:', err)
     }
   },
 
   updateMemory: async (id, title, date, notes, imageUrls) => {
-    const { data, error } = await supabase
-      .from('memories')
-      .update({ title, date, notes, image_urls: imageUrls })
-      .eq('id', id)
-      .select()
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('memories')
+        .update({ title, date, notes, image_urls: imageUrls })
+        .eq('id', id)
+        .select()
+        .single()
 
-    if (data && !error) {
-      set((s) => ({
-        memories: s.memories.map((m) => (m.id === id ? mapMemory(data) : m)),
-      }))
+      if (error) console.error('Failed to update memory:', error)
+      if (data && !error) {
+        set((s) => ({
+          memories: s.memories.map((m) => (m.id === id ? mapMemory(data) : m)),
+        }))
+      }
+    } catch (err) {
+      console.error('Failed to update memory:', err)
     }
   },
 
   deleteMemory: async (id) => {
-    const { error } = await supabase.from('memories').delete().eq('id', id)
-    if (!error) {
-      set((s) => ({ memories: s.memories.filter((m) => m.id !== id) }))
+    try {
+      const { error } = await supabase.from('memories').delete().eq('id', id)
+      if (error) console.error('Failed to delete memory:', error)
+      if (!error) {
+        set((s) => ({ memories: s.memories.filter((m) => m.id !== id) }))
+      }
+    } catch (err) {
+      console.error('Failed to delete memory:', err)
     }
   },
 }))

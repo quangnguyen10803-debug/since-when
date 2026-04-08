@@ -34,13 +34,18 @@ export default function FolderModal({ folder, onClose }: FolderModalProps) {
     e.preventDefault()
     if (!name.trim()) return
     setSaving(true)
-    if (folder) {
-      await updateFolder(folder.id, name.trim(), color, coverImageUrl)
-    } else {
-      await addFolder(name.trim(), color, coverImageUrl)
+    try {
+      if (folder) {
+        await updateFolder(folder.id, name.trim(), color, coverImageUrl)
+      } else {
+        await addFolder(name.trim(), color, coverImageUrl)
+      }
+      onClose()
+    } catch (err) {
+      console.error('Failed to save folder:', err)
+    } finally {
+      setSaving(false)
     }
-    setSaving(false)
-    onClose()
   }
 
   return (

@@ -17,28 +17,49 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initialize: () => {
     // Safety net: if auth doesn't resolve in 5s, unblock the UI
+    let resolved = false
     const timeout = setTimeout(() => {
-      set((s) => s.initialized ? s : { ...s, user: null, initialized: true })
+      if (!resolved) {
+        resolved = true
+        set({ user: null, initialized: true })
+      }
     }, 5000)
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
-      clearTimeout(timeout)
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('name')
-          .eq('id', session.user.id)
-          .single()
+      try {
+        if (session?.user) {
+          // Try to get profile name, but don't let it block initialization
+          let name = session.user.user_metadata?.name ?? session.user.email!.split('@')[0]
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('name')
+              .eq('id', session.user.id)
+              .single()
+            if (profile?.name) name = profile.name
+          } catch {
+            // Profile fetch failed — use fallback name, don't block
+          }
 
-        set({
-          user: {
-            id: session.user.id,
-            email: session.user.email!,
-            name: profile?.name ?? session.user.email!.split('@')[0],
-          },
-          initialized: true,
-        })
-      } else {
+          resolved = true
+          clearTimeout(timeout)
+          set({
+            user: {
+              id: session.user.id,
+              email: session.user.email!,
+              name,
+            },
+            initialized: true,
+          })
+        } else {
+          resolved = true
+          clearTimeout(timeout)
+          set({ user: null, initialized: true })
+        }
+      } catch (err) {
+        console.error('Auth state change error:', err)
+        resolved = true
+        clearTimeout(timeout)
         set({ user: null, initialized: true })
       }
     })
