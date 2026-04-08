@@ -13,9 +13,14 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const err = await login(email.trim(), password)
-    if (err) setError(err)
-    setLoading(false)
+    try {
+      const err = await login(email.trim(), password)
+      if (err) setError(err)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

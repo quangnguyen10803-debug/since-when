@@ -19,12 +19,17 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
-    const err = await register(email.trim(), password, name.trim())
-    if (err) {
-      setError(err)
+    try {
+      const err = await register(email.trim(), password, name.trim())
+      if (err) {
+        setError(err)
+      } else {
+        setDone(true)
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
       setLoading(false)
-    } else {
-      setDone(true)
     }
   }
 

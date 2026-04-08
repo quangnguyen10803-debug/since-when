@@ -66,20 +66,32 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   login: async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return error?.message ?? null
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      return error?.message ?? null
+    } catch {
+      return 'Network error — please check your connection and try again.'
+    }
   },
 
   register: async (email, password, name) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } },
-    })
-    return error?.message ?? null
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      })
+      return error?.message ?? null
+    } catch {
+      return 'Network error — please check your connection and try again.'
+    }
   },
 
   logout: async () => {
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore logout errors
+    }
   },
 }))
