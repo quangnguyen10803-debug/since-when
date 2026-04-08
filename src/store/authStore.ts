@@ -11,66 +11,66 @@ interface AuthState {
   initialize: () => void
 }
 
+function nameFromSession(session: { user: { email?: string; user_metadata?: Record<string, string> } }) {
+  return session.user.user_metadata?.name ?? session.user.email?.split('@')[0] ?? 'User'
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   initialized: false,
 
   initialize: () => {
-    // Safety net: if auth doesn't resolve in 5s, unblock the UI
-    let resolved = false
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true
-        set({ user: null, initialized: true })
-      }
-    }, 5000)
+    // Unblock the UI after 8s no matter what
+    const fallback = setTimeout(() => {
+      set((s) => s.initialized ? s : { user: null, initialized: true })
+    }, 8000)
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
         if (session?.user) {
-          // Try to get profile name, but don't let it block initialization
-          let name = session.user.user_metadata?.name ?? session.user.email!.split('@')[0]
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('name')
-              .eq('id', session.user.id)
-              .single()
-            if (profile?.name) name = profile.name
-          } catch {
-            // Profile fetch failed — use fallback name, don't block
-          }
+          // Use metadata name immediately — don't block on DB call
+          const fallbackName = nameFromSession(session)
 
-          resolved = true
-          clearTimeout(timeout)
+          // Set user right away so the app doesn't hang
           set({
-            user: {
-              id: session.user.id,
-              email: session.user.email!,
-              name,
-            },
+            user: { id: session.user.id, email: session.user.email!, name: fallbackName },
             initialized: true,
           })
+          clearTimeout(fallback)
+
+          // Then try to enrich with profile name in the background
+          void supabase
+            .from('profiles')
+            .select('name')
+            .eq('id', session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data?.name) {
+                set((s) => s.user ? { user: { ...s.user, name: data.name } } : s)
+              }
+            })
         } else {
-          resolved = true
-          clearTimeout(timeout)
+          clearTimeout(fallback)
           set({ user: null, initialized: true })
         }
-      } catch (err) {
-        console.error('Auth state change error:', err)
-        resolved = true
-        clearTimeout(timeout)
-        set({ user: null, initialized: true })
       }
-    })
+    )
+
+    // Return cleanup in case component unmounts (not strictly needed for global store)
+    return () => subscription.unsubscribe()
   },
 
   login: async (email, password) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      return error?.message ?? null
-    } catch {
-      return 'Network error — please check your connection and try again.'
+      if (error) return error.message
+      return null
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('abort') || msg.includes('timeout') || msg.includes('network')) {
+        return 'Connection timed out. Check your internet and try again.'
+      }
+      return 'Sign in failed. Please try again.'
     }
   },
 
@@ -81,9 +81,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         password,
         options: { data: { name } },
       })
-      return error?.message ?? null
-    } catch {
-      return 'Network error — please check your connection and try again.'
+      if (error) return error.message
+      return null
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('abort') || msg.includes('timeout') || msg.includes('network')) {
+        return 'Connection timed out. Check your internet and try again.'
+      }
+      return 'Registration failed. Please try again.'
     }
   },
 
@@ -91,7 +96,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       await supabase.auth.signOut()
     } catch {
-      // ignore logout errors
+      // Force local sign-out even if server call fails
+      set({ user: null })
     }
   },
 }))
