@@ -19,18 +19,24 @@ type CalendarMode = '6x2' | '4x3' | '365'
 
 const CURRENT_YEAR = new Date().getFullYear()
 
+// Fixed cell size for the compact 365 view
+const CELL_PX = 8
+const GAP_PX = 2
+
 export default function CalendarView() {
   const { folders, memories } = useAppStore()
   const [visible, setVisible] = useState(true)
   const [year, setYear] = useState(CURRENT_YEAR)
   const [mode, setMode] = useState<CalendarMode>('6x2')
 
+  // Collect ALL folder colors per date (up to 4) to drive multi-memory dots
   const dateColors = useMemo(() => {
-    const map: Record<string, FolderColor> = {}
+    const map: Record<string, FolderColor[]> = {}
     memories.forEach((m) => {
-      if (map[m.date]) return
       const folder = folders.find((f) => f.id === m.folderId)
-      if (folder) map[m.date] = folder.color
+      if (!folder) return
+      if (!map[m.date]) map[m.date] = []
+      if (map[m.date].length < 4) map[m.date].push(folder.color)
     })
     return map
   }, [memories, folders])
@@ -44,7 +50,7 @@ export default function CalendarView() {
 
   return (
     <div className="border-b-2 border-black">
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b-2 border-black bg-[#FFFFE0]">
         <button
           onClick={() => setVisible((v) => !v)}
@@ -72,7 +78,7 @@ export default function CalendarView() {
             </div>
 
             {/* Year nav */}
-            <div className="flex items-center gap-0 border-2 border-black">
+            <div className="flex items-center border-2 border-black">
               <button
                 onClick={() => setYear((y) => y - 1)}
                 className="px-1.5 py-0.5 text-black hover:bg-[#FFE500] border-r-2 border-black transition-none"
@@ -115,11 +121,12 @@ export default function CalendarView() {
   )
 }
 
-// ─── 365 dot-field view ─────────────────────────────────────────────────────
+// ─── 365 view — horizontal GitHub-style (7 rows × 53 cols) ──────────────────
+// Total height: 7×8px + 6×2px gap = 68px — very compact
 
 interface Year365Props {
   year: number
-  dateColors: Record<string, FolderColor>
+  dateColors: Record<string, FolderColor[]>
 }
 
 function Year365View({ year, dateColors }: Year365Props) {
@@ -128,28 +135,58 @@ function Year365View({ year, dateColors }: Year365Props) {
     end: endOfYear(new Date(year, 11, 31)),
   })
 
-  const firstDayOffset = (getDay(allDays[0]) + 6) % 7 // Monday = 0
+  // Monday = 0, offset so Jan 1 lands on correct column
+  const firstDayOffset = (getDay(allDays[0]) + 6) % 7
 
   return (
-    <div>
-      {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 gap-[2px] mb-1">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-          <div key={i} className="text-[8px] font-bold text-center text-gray-500">{d}</div>
+    <div className="flex items-start gap-1.5 overflow-x-auto">
+      {/* Day-of-week labels (Mon, Wed, Fri only to save space) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: `repeat(7, ${CELL_PX}px)`,
+          gap: `${GAP_PX}px`,
+          flexShrink: 0,
+        }}
+      >
+        {['M', '', 'W', '', 'F', '', ''].map((label, i) => (
+          <div
+            key={i}
+            style={{
+              height: CELL_PX,
+              fontSize: 6,
+              fontWeight: 700,
+              color: '#888',
+              lineHeight: `${CELL_PX}px`,
+              width: 8,
+            }}
+          >
+            {label}
+          </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-[2px]">
+      {/* Dot grid — 7 rows, auto columns (one per week) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: `repeat(7, ${CELL_PX}px)`,
+          gridAutoColumns: CELL_PX,
+          gridAutoFlow: 'column',
+          gap: GAP_PX,
+        }}
+      >
+        {/* Empty offset cells to align Jan 1 */}
         {Array.from({ length: firstDayOffset }).map((_, i) => (
-          <div key={`e-${i}`} className="aspect-square" />
+          <div key={`e-${i}`} />
         ))}
         {allDays.map((day) => {
           const dateStr = format(day, 'yyyy-MM-dd')
-          const color = dateColors[dateStr] ?? null
+          const colors = dateColors[dateStr] ?? []
           const future = isFuture(day) && !isToday(day)
           const today = isToday(day)
           return (
-            <DayCell key={dateStr} color={color} future={future} today={today} />
+            <CompactDayCell key={dateStr} colors={colors} future={future} today={today} />
           )
         })}
       </div>
@@ -157,11 +194,11 @@ function Year365View({ year, dateColors }: Year365Props) {
   )
 }
 
-// ─── Mini month (6×2 and 4×3 modes) ─────────────────────────────────────────
+// ─── Mini month (6×2 and 4×3) ────────────────────────────────────────────────
 
 interface MiniMonthProps {
   monthDate: Date
-  dateColors: Record<string, FolderColor>
+  dateColors: Record<string, FolderColor[]>
 }
 
 function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
@@ -170,7 +207,7 @@ function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
     end: endOfMonth(monthDate),
   })
 
-  const firstDow = (getDay(days[0]) + 6) % 7 // Monday = 0
+  const firstDow = (getDay(days[0]) + 6) % 7
 
   return (
     <div className="min-w-0">
@@ -183,11 +220,11 @@ function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
         ))}
         {days.map((day) => {
           const dateStr = format(day, 'yyyy-MM-dd')
-          const color = dateColors[dateStr] ?? null
+          const colors = dateColors[dateStr] ?? []
           const future = isFuture(day) && !isToday(day)
           const today = isToday(day)
           return (
-            <DayCell key={dateStr} color={color} future={future} today={today} />
+            <DayCell key={dateStr} colors={colors} future={future} today={today} />
           )
         })}
       </div>
@@ -195,39 +232,141 @@ function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
   )
 }
 
-// ─── Day cell ────────────────────────────────────────────────────────────────
+// ─── DayCell — for mini-month views (aspect-square, scales with month width) ─
+// Renders 1 / 2-side-by-side / 2×2 grid depending on memory count
 
 function DayCell({
-  color,
+  colors,
   future,
   today,
 }: {
-  color: FolderColor | null
+  colors: FolderColor[]
   future: boolean
   today: boolean
 }) {
   if (future) return <div className="aspect-square" />
 
-  if (color) {
+  const count = colors.length
+
+  if (count === 0) {
+    if (today) {
+      return (
+        <div className="aspect-square flex items-center justify-center">
+          <div
+            style={{
+              width: '70%',
+              height: '70%',
+              backgroundColor: '#FFE500',
+              outline: '1.5px solid #000',
+              outlineOffset: 0,
+            }}
+          />
+        </div>
+      )
+    }
     return (
       <div className="aspect-square flex items-center justify-center">
-        <div className={`w-[7px] h-[7px] ${COLOR_MAP[color]?.dot ?? 'bg-gray-400'}`} />
+        <div style={{ width: '45%', height: '45%', backgroundColor: '#d1d5db' }} />
       </div>
     )
   }
 
-  if (today) {
+  if (count === 1) {
     return (
       <div className="aspect-square flex items-center justify-center">
-        <div className="w-[7px] h-[7px] border-2 border-black bg-[#FFE500]" />
+        <div style={{ width: '70%', height: '70%', backgroundColor: COLOR_MAP[colors[0]].hex }} />
       </div>
     )
   }
 
-  // Past, no memory
+  // 2–4 memories: 2×2 grid, unfilled slots are transparent
+  const slots: (FolderColor | null)[] = [
+    colors[0] ?? null,
+    colors[1] ?? null,
+    colors[2] ?? null,
+    colors[3] ?? null,
+  ]
+
   return (
     <div className="aspect-square flex items-center justify-center">
-      <div className="w-[5px] h-[5px] bg-gray-300" />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: '1px',
+          width: '80%',
+          height: '80%',
+        }}
+      >
+        {slots.map((c, i) => (
+          <div
+            key={i}
+            style={{ backgroundColor: c ? COLOR_MAP[c].hex : 'transparent' }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── CompactDayCell — for 365 view (fixed CELL_PX size, fills the cell) ──────
+
+function CompactDayCell({
+  colors,
+  future,
+  today,
+}: {
+  colors: FolderColor[]
+  future: boolean
+  today: boolean
+}) {
+  const size = CELL_PX
+
+  if (future) return <div style={{ width: size, height: size }} />
+
+  const count = colors.length
+
+  if (count === 0) {
+    return (
+      <div
+        style={{
+          width: size,
+          height: size,
+          backgroundColor: today ? '#FFE500' : '#d1d5db',
+          outline: today ? '1px solid #000' : undefined,
+          outlineOffset: 0,
+        }}
+      />
+    )
+  }
+
+  if (count === 1) {
+    return (
+      <div style={{ width: size, height: size, backgroundColor: COLOR_MAP[colors[0]].hex }} />
+    )
+  }
+
+  // 2–4 memories: 2×2 sub-grid filling the full cell
+  const slots: (FolderColor | null)[] = [
+    colors[0] ?? null,
+    colors[1] ?? null,
+    colors[2] ?? null,
+    colors[3] ?? null,
+  ]
+
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '1px',
+      }}
+    >
+      {slots.map((c, i) => (
+        <div key={i} style={{ backgroundColor: c ? COLOR_MAP[c].hex : 'transparent' }} />
+      ))}
     </div>
   )
 }
