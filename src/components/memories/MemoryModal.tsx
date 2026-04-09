@@ -56,13 +56,13 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
 
   return (
     <Modal title={memory ? 'Edit memory' : 'Log a memory'} onClose={onClose} maxWidth="max-w-lg">
-      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+            <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">Title</label>
             <input
               type="text"
-              className="notion-input"
+              className="brutal-input"
               placeholder="e.g. Cafe hopping"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -71,10 +71,10 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Date</label>
+            <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">Date</label>
             <input
               type="date"
-              className="notion-input"
+              className="brutal-input"
               value={date}
               onChange={(e) => setDate(e.target.value)}
               required
@@ -83,9 +83,9 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+          <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">Notes</label>
           <textarea
-            className="notion-input resize-none"
+            className="brutal-input resize-none"
             rows={4}
             placeholder="What happened? What do you want to remember?"
             value={notes}
@@ -94,22 +94,23 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-2">
-            Photos <span className="text-gray-400 font-normal">({images.length}/5)</span>
+          <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">
+            Photos <span className="font-normal text-gray-500">({images.length}/5)</span>
           </label>
 
           {images.length > 0 && (
             <div className="flex gap-2 flex-wrap mb-2">
               {images.map((src, i) => (
-                <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden group">
+                <div key={i} className="relative w-20 h-20 overflow-hidden group border-2 border-black"
+                  style={{ boxShadow: '2px 2px 0px #000' }}>
                   <img src={src} alt="" className="w-full h-full object-cover" />
                   <button
                     type="button"
                     onClick={() => removeImage(i)}
-                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5
-                               opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-0.5 right-0.5 bg-black text-[#FFE500] p-0.5
+                               opacity-0 group-hover:opacity-100 transition-opacity border border-[#FFE500]"
                   >
-                    <X size={12} />
+                    <X size={11} />
                   </button>
                 </div>
               ))}
@@ -130,11 +131,11 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="flex items-center gap-2 px-3 py-2 border border-dashed border-gray-300
-                           rounded-lg text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700
-                           transition-colors disabled:opacity-50 w-full justify-center"
+                className="flex items-center gap-2 px-3 py-2 border-2 border-dashed border-black
+                           text-[11px] font-bold text-black hover:bg-[#FFFFE0]
+                           transition-none disabled:opacity-50 w-full justify-center"
               >
-                <ImagePlus size={14} />
+                <ImagePlus size={13} />
                 {uploading ? 'Adding...' : 'Add photos'}
               </button>
             </>
@@ -142,10 +143,10 @@ export default function MemoryModal({ folderId, memory, onClose }: MemoryModalPr
         </div>
 
         <div className="flex gap-2 justify-end pt-1">
-          <button type="button" onClick={onClose} className="notion-btn-secondary">
+          <button type="button" onClick={onClose} className="brutal-btn-secondary">
             Cancel
           </button>
-          <button type="submit" className="notion-btn-primary">
+          <button type="submit" className="brutal-btn-primary">
             {memory ? 'Save changes' : 'Log memory'}
           </button>
         </div>

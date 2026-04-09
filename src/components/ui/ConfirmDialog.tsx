@@ -17,15 +17,15 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <Modal title={title} onClose={onClose}>
-      <div className="p-5 space-y-4">
-        <p className="text-sm text-gray-600">{message}</p>
+      <div className="p-4 space-y-4">
+        <p className="text-sm text-black font-medium">{message}</p>
         <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="notion-btn-secondary">
+          <button onClick={onClose} className="brutal-btn-secondary">
             Cancel
           </button>
           <button
             onClick={() => { onConfirm(); onClose() }}
-            className="notion-btn-danger"
+            className="brutal-btn-danger"
           >
             {confirmLabel}
           </button>

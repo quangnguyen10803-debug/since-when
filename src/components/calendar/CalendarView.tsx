@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import {
   startOfMonth,
   endOfMonth,
+  startOfYear,
+  endOfYear,
   eachDayOfInterval,
   getDay,
   format,
@@ -13,12 +15,15 @@ import { useAppStore } from '../../store/appStore'
 import { COLOR_MAP } from '../../types'
 import type { FolderColor } from '../../types'
 
+type CalendarMode = '6x2' | '4x3' | '365'
+
 const CURRENT_YEAR = new Date().getFullYear()
 
 export default function CalendarView() {
   const { folders, memories } = useAppStore()
   const [visible, setVisible] = useState(true)
   const [year, setYear] = useState(CURRENT_YEAR)
+  const [mode, setMode] = useState<CalendarMode>('6x2')
 
   const dateColors = useMemo(() => {
     const map: Record<string, FolderColor> = {}
@@ -30,65 +35,129 @@ export default function CalendarView() {
     return map
   }, [memories, folders])
 
-  // 12 months of the selected year
   const months = useMemo(
     () => Array.from({ length: 12 }, (_, i) => new Date(year, i, 1)),
     [year]
   )
 
+  const gridCols = mode === '4x3' ? 'grid-cols-4' : 'grid-cols-6'
+
   return (
-    <div className="border-b border-gray-100">
+    <div className="border-b-2 border-black">
       {/* Header row */}
-      <div className="flex items-center justify-between px-4 py-2">
-        {/* Toggle */}
+      <div className="flex items-center justify-between px-3 py-2 border-b-2 border-black bg-[#FFFFE0]">
         <button
           onClick={() => setVisible((v) => !v)}
-          className="flex items-center gap-1 text-[11px] font-semibold text-gray-400
-                     uppercase tracking-wider hover:text-gray-600 transition-colors"
+          className="flex items-center gap-1 text-[10px] font-bold text-black uppercase tracking-widest hover:text-[#555] transition-colors"
         >
-          {visible ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {visible ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           Calendar
         </button>
 
-        {/* Year nav */}
         {visible && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setYear((y) => y - 1)}
-              className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-sm font-bold text-gray-800 w-10 text-center">{year}</span>
-            <button
-              onClick={() => setYear((y) => y + 1)}
-              disabled={year >= CURRENT_YEAR}
-              className="p-0.5 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100
-                         transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            >
-              <ChevronRight size={14} />
-            </button>
+            {/* Mode toggle */}
+            <div className="flex border-2 border-black">
+              {(['6x2', '4x3', '365'] as CalendarMode[]).map((m, i) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-none
+                    ${i < 2 ? 'border-r-2 border-black' : ''}
+                    ${mode === m ? 'bg-black text-[#FFE500]' : 'bg-transparent text-black hover:bg-[#FFE500]'}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+
+            {/* Year nav */}
+            <div className="flex items-center gap-0 border-2 border-black">
+              <button
+                onClick={() => setYear((y) => y - 1)}
+                className="px-1.5 py-0.5 text-black hover:bg-[#FFE500] border-r-2 border-black transition-none"
+              >
+                <ChevronLeft size={12} />
+              </button>
+              <span className="text-[11px] font-bold text-black px-2">{year}</span>
+              <button
+                onClick={() => setYear((y) => y + 1)}
+                disabled={year >= CURRENT_YEAR}
+                className="px-1.5 py-0.5 text-black hover:bg-[#FFE500] border-l-2 border-black
+                           transition-none disabled:opacity-25 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={12} />
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Calendar grid */}
+      {/* Calendar content */}
       {visible && (
-        <div className="px-4 pb-3">
-          <div className="grid grid-cols-6 gap-x-3 gap-y-3">
-            {months.map((monthDate) => (
-              <MiniMonth
-                key={monthDate.toISOString()}
-                monthDate={monthDate}
-                dateColors={dateColors}
-              />
-            ))}
-          </div>
+        <div className="px-3 py-2">
+          {mode === '365' ? (
+            <Year365View year={year} dateColors={dateColors} />
+          ) : (
+            <div className={`grid ${gridCols} gap-x-2 gap-y-2`}>
+              {months.map((monthDate) => (
+                <MiniMonth
+                  key={monthDate.toISOString()}
+                  monthDate={monthDate}
+                  dateColors={dateColors}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
+
+// ─── 365 dot-field view ─────────────────────────────────────────────────────
+
+interface Year365Props {
+  year: number
+  dateColors: Record<string, FolderColor>
+}
+
+function Year365View({ year, dateColors }: Year365Props) {
+  const allDays = eachDayOfInterval({
+    start: startOfYear(new Date(year, 0, 1)),
+    end: endOfYear(new Date(year, 11, 31)),
+  })
+
+  const firstDayOffset = (getDay(allDays[0]) + 6) % 7 // Monday = 0
+
+  return (
+    <div>
+      {/* Day-of-week headers */}
+      <div className="grid grid-cols-7 gap-[2px] mb-1">
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+          <div key={i} className="text-[8px] font-bold text-center text-gray-500">{d}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-[2px]">
+        {Array.from({ length: firstDayOffset }).map((_, i) => (
+          <div key={`e-${i}`} className="aspect-square" />
+        ))}
+        {allDays.map((day) => {
+          const dateStr = format(day, 'yyyy-MM-dd')
+          const color = dateColors[dateStr] ?? null
+          const future = isFuture(day) && !isToday(day)
+          const today = isToday(day)
+          return (
+            <DayCell key={dateStr} color={color} future={future} today={today} />
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Mini month (6×2 and 4×3 modes) ─────────────────────────────────────────
 
 interface MiniMonthProps {
   monthDate: Date
@@ -105,7 +174,7 @@ function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
 
   return (
     <div className="min-w-0">
-      <p className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide mb-1 truncate">
+      <p className="text-[8px] font-bold text-black uppercase tracking-widest mb-1 truncate">
         {format(monthDate, 'MMM')}
       </p>
       <div className="grid grid-cols-7 gap-[2px]">
@@ -126,6 +195,8 @@ function MiniMonth({ monthDate, dateColors }: MiniMonthProps) {
   )
 }
 
+// ─── Day cell ────────────────────────────────────────────────────────────────
+
 function DayCell({
   color,
   future,
@@ -138,10 +209,9 @@ function DayCell({
   if (future) return <div className="aspect-square" />
 
   if (color) {
-    // Colored square: centered, 1.4× dot size
     return (
       <div className="aspect-square flex items-center justify-center">
-        <div className={`w-[8px] h-[8px] rounded-[2px] ${COLOR_MAP[color]?.dot ?? 'bg-gray-400'}`} />
+        <div className={`w-[7px] h-[7px] ${COLOR_MAP[color]?.dot ?? 'bg-gray-400'}`} />
       </div>
     )
   }
@@ -149,15 +219,15 @@ function DayCell({
   if (today) {
     return (
       <div className="aspect-square flex items-center justify-center">
-        <div className="w-[6px] h-[6px] rounded-full ring-[1.5px] ring-gray-400" />
+        <div className="w-[7px] h-[7px] border-2 border-black bg-[#FFE500]" />
       </div>
     )
   }
 
-  // Past, no memory — dot
+  // Past, no memory
   return (
     <div className="aspect-square flex items-center justify-center">
-      <div className="w-[4px] h-[4px] rounded-full bg-gray-200" />
+      <div className="w-[5px] h-[5px] bg-gray-300" />
     </div>
   )
 }

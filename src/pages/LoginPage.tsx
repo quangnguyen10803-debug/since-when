@@ -24,19 +24,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#FFFFF0] px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Since When</h1>
-          <p className="mt-1 text-sm text-gray-500">Track memories with your people</p>
+
+        {/* Header block */}
+        <div className="mb-6 bg-black px-5 py-4 border-2 border-black" style={{ boxShadow: '6px 6px 0px #FFE500' }}>
+          <h1 className="text-2xl font-bold text-[#FFE500] tracking-tight uppercase">Since When</h1>
+          <p className="mt-0.5 text-xs font-bold text-gray-400 uppercase tracking-widest">Track memories with your people</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-[#FFFFE0] border-2 border-black p-5 space-y-4"
+          style={{ boxShadow: '6px 6px 0px #000' }}
+        >
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+            <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">Email</label>
             <input
               type="email"
-              className="notion-input"
+              className="brutal-input"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -45,10 +51,10 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Password</label>
+            <label className="block text-[10px] font-bold text-black uppercase tracking-wider mb-1.5">Password</label>
             <input
               type="password"
-              className="notion-input"
+              className="brutal-input"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -57,7 +63,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+            <p className="text-xs font-bold text-white bg-black border-2 border-black px-3 py-2">
               {error}
             </p>
           )}
@@ -65,14 +71,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="notion-btn-primary w-full disabled:opacity-60"
+            className="brutal-btn-primary w-full justify-center"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : 'Sign in →'}
           </button>
 
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
             No account?{' '}
-            <Link to="/register" className="text-gray-900 font-medium hover:underline">
+            <Link to="/register" className="text-black underline hover:text-gray-600">
               Create one
             </Link>
           </p>

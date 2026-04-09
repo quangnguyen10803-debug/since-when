@@ -57,13 +57,14 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-2 border-gray-900 rounded-xl p-4 bg-white space-y-3"
+      className="border-2 border-black p-3 bg-white space-y-3"
+      style={{ boxShadow: '4px 4px 0px #000' }}
     >
       {/* Title + Date row */}
       <div className="flex gap-2">
         <input
           type="text"
-          className="notion-input flex-1"
+          className="brutal-input flex-1"
           placeholder="Title, e.g. Cafe hopping"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -72,7 +73,7 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
         />
         <input
           type="date"
-          className="notion-input w-36"
+          className="brutal-input w-36"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
@@ -81,7 +82,7 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
 
       {/* Notes */}
       <textarea
-        className="notion-input resize-none w-full"
+        className="brutal-input resize-none w-full"
         rows={3}
         placeholder="Add notes… what happened, what do you want to remember?"
         value={notes}
@@ -93,15 +94,15 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
         {images.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-2">
             {images.map((src, i) => (
-              <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden group/img flex-shrink-0">
+              <div key={i} className="relative w-16 h-16 overflow-hidden group/img flex-shrink-0 border-2 border-black">
                 <img src={src} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
-                  className="absolute top-0.5 right-0.5 bg-black/50 text-white rounded-full p-0.5
+                  className="absolute top-0.5 right-0.5 bg-black text-[#FFE500] border border-black p-0.5
                              opacity-0 group-hover/img:opacity-100 transition-opacity"
                 >
-                  <X size={10} />
+                  <X size={9} />
                 </button>
               </div>
             ))}
@@ -121,11 +122,11 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600
-                         border border-dashed border-gray-200 hover:border-gray-300 rounded-lg
-                         px-3 py-1.5 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-black
+                         border-2 border-dashed border-black hover:bg-[#FFFFE0]
+                         px-3 py-1.5 transition-none disabled:opacity-50"
             >
-              <ImagePlus size={13} />
+              <ImagePlus size={12} />
               {uploading ? 'Uploading…' : `Add photos (${images.length}/5)`}
             </button>
           </>
@@ -134,13 +135,13 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
 
       {/* Actions */}
       <div className="flex gap-2 justify-end pt-1">
-        <button type="button" onClick={onDone} disabled={saving} className="notion-btn-secondary">
+        <button type="button" onClick={onDone} disabled={saving} className="brutal-btn-secondary">
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving || uploading}
-          className="notion-btn-primary disabled:opacity-60"
+          className="brutal-btn-primary"
         >
           {saving ? 'Saving…' : memory ? 'Save changes' : 'Log memory'}
         </button>

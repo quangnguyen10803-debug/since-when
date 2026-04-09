@@ -19,7 +19,7 @@ export interface Folder {
   id: string
   name: string
   color: FolderColor
-  coverImage?: string // base64
+  coverImage?: string
   createdAt: string
 }
 
@@ -29,7 +29,7 @@ export interface Memory {
   title: string
   date: string // ISO date string YYYY-MM-DD
   notes: string
-  images: string[] // base64
+  images: string[]
   createdAt: string
 }
 
@@ -37,19 +37,33 @@ export const FOLDER_COLORS: FolderColor[] = [
   'gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red',
 ]
 
-export const COLOR_MAP: Record<FolderColor, { bg: string; text: string; dot: string }> = {
-  gray:   { bg: 'bg-gray-100',   text: 'text-gray-600',   dot: 'bg-[#9B9A97]' },
-  brown:  { bg: 'bg-amber-100',  text: 'text-amber-900',  dot: 'bg-[#64473A]' },
-  orange: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-[#D9730D]' },
-  yellow: { bg: 'bg-yellow-100', text: 'text-yellow-700', dot: 'bg-[#CB912F]' },
-  green:  { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-[#448361]' },
-  blue:   { bg: 'bg-blue-100',   text: 'text-blue-700',   dot: 'bg-[#337EA9]' },
-  purple: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-[#9065B0]' },
-  pink:   { bg: 'bg-pink-100',   text: 'text-pink-700',   dot: 'bg-[#C14C8A]' },
-  red:    { bg: 'bg-red-100',    text: 'text-red-700',    dot: 'bg-[#D44C47]' },
+// Solid hex colors for folder card backgrounds and color swatches
+export const COLOR_SOLID: Record<FolderColor, { bg: string; text: string }> = {
+  gray:   { bg: '#9B9A97', text: '#000' },
+  brown:  { bg: '#64473A', text: '#fff' },
+  orange: { bg: '#D9730D', text: '#fff' },
+  yellow: { bg: '#CB912F', text: '#000' },
+  green:  { bg: '#448361', text: '#fff' },
+  blue:   { bg: '#337EA9', text: '#fff' },
+  purple: { bg: '#9065B0', text: '#fff' },
+  pink:   { bg: '#C14C8A', text: '#fff' },
+  red:    { bg: '#D44C47', text: '#fff' },
 }
 
-// Tailwind gradient classes for folder card backgrounds (no cover image)
+// Dot color classes used in calendar — hex bg via Tailwind arbitrary value
+export const COLOR_MAP: Record<FolderColor, { bg: string; text: string; dot: string; hex: string }> = {
+  gray:   { bg: 'bg-gray-300',   text: 'text-black', dot: 'bg-[#9B9A97]', hex: '#9B9A97' },
+  brown:  { bg: 'bg-amber-700',  text: 'text-white', dot: 'bg-[#64473A]', hex: '#64473A' },
+  orange: { bg: 'bg-orange-400', text: 'text-black', dot: 'bg-[#D9730D]', hex: '#D9730D' },
+  yellow: { bg: 'bg-yellow-300', text: 'text-black', dot: 'bg-[#CB912F]', hex: '#CB912F' },
+  green:  { bg: 'bg-green-600',  text: 'text-white', dot: 'bg-[#448361]', hex: '#448361' },
+  blue:   { bg: 'bg-blue-500',   text: 'text-white', dot: 'bg-[#337EA9]', hex: '#337EA9' },
+  purple: { bg: 'bg-purple-500', text: 'text-white', dot: 'bg-[#9065B0]', hex: '#9065B0' },
+  pink:   { bg: 'bg-pink-500',   text: 'text-white', dot: 'bg-[#C14C8A]', hex: '#C14C8A' },
+  red:    { bg: 'bg-red-500',    text: 'text-white', dot: 'bg-[#D44C47]', hex: '#D44C47' },
+}
+
+// Kept for compatibility — solid colors replace gradients
 export const COLOR_GRADIENTS: Record<FolderColor, string> = {
   gray:   'from-gray-300 to-gray-500',
   brown:  'from-amber-600 to-amber-900',
