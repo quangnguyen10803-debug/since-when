@@ -1,9 +1,12 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function RegisterPage() {
   const register = useAuthStore((s) => s.register)
+  const [searchParams] = useSearchParams()
+  const redirect = searchParams.get('redirect')
+
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,6 +36,8 @@ export default function RegisterPage() {
     }
   }
 
+  const loginLink = redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'
+
   if (done) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FFFFF0] px-4">
@@ -45,7 +50,7 @@ export default function RegisterPage() {
               Click it to activate your account, then sign in.
             </p>
           </div>
-          <Link to="/login" className="brutal-btn-primary inline-block">
+          <Link to={loginLink} className="brutal-btn-primary inline-block">
             Go to sign in →
           </Link>
         </div>
@@ -119,7 +124,7 @@ export default function RegisterPage() {
 
           <p className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
             Already have an account?{' '}
-            <Link to="/login" className="text-black underline hover:text-gray-600">
+            <Link to={loginLink} className="text-black underline hover:text-gray-600">
               Sign in
             </Link>
           </p>

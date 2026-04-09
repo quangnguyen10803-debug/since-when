@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, BookOpen } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
+import { useAuthStore } from '../../store/authStore'
 import { COLOR_MAP, COLOR_SOLID } from '../../types'
 import type { FolderColor } from '../../types'
 import InlineMemoryForm from './InlineMemoryForm'
@@ -55,6 +56,7 @@ function ImageLightbox({
 
 export default function MemoryList() {
   const { folders, memories, selectedFolderId, deleteMemory } = useAppStore()
+  const currentUser = useAuthStore((s) => s.user)
 
   const [inlineMode, setInlineMode] = useState<'create' | string | null>(null)
   const [deletingMemory, setDeletingMemory] = useState<Memory | null>(null)
@@ -132,6 +134,8 @@ export default function MemoryList() {
                 folderColor={folder.color}
                 folderSolid={solid}
                 isAnyInlineOpen={inlineMode !== null}
+                isOwnMemory={!memory.userId || memory.userId === currentUser?.id}
+                isSharedFolder={folder.isShared || false}
                 onEdit={() => setInlineMode(memory.id)}
                 onDelete={() => setDeletingMemory(memory)}
                 onImageClick={(images, idx) => setLightbox({ images, idx })}
@@ -167,12 +171,14 @@ interface MemoryCardProps {
   folderColor: FolderColor
   folderSolid: { bg: string; text: string }
   isAnyInlineOpen: boolean
+  isOwnMemory: boolean
+  isSharedFolder: boolean
   onEdit: () => void
   onDelete: () => void
   onImageClick: (images: string[], idx: number) => void
 }
 
-function MemoryCard({ memory, folderColor, folderSolid, isAnyInlineOpen, onEdit, onDelete, onImageClick }: MemoryCardProps) {
+function MemoryCard({ memory, folderColor, folderSolid, isAnyInlineOpen, isOwnMemory, isSharedFolder, onEdit, onDelete, onImageClick }: MemoryCardProps) {
   return (
     <div
       className="group border-2 border-black p-3 bg-[#FFFFE0]"
@@ -187,23 +193,35 @@ function MemoryCard({ memory, folderColor, folderSolid, isAnyInlineOpen, onEdit,
           >
             {formatMemoryDate(memory.date)}
           </span>
+          {/* Creator badge for shared folders */}
+          {isSharedFolder && memory.createdByName && (
+            <span className="text-[9px] px-1.5 py-0.5 border-2 border-black bg-white font-bold text-gray-600 flex-shrink-0 flex items-center gap-1">
+              <span className="w-3.5 h-3.5 bg-black text-[#FFE500] text-[7px] font-bold flex items-center justify-center flex-shrink-0">
+                {memory.createdByName.charAt(0).toUpperCase()}
+              </span>
+              {memory.createdByName}
+            </span>
+          )}
         </div>
-        <div className={`flex gap-0.5 flex-shrink-0 transition-opacity
-          ${isAnyInlineOpen ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}
-        >
-          <button
-            onClick={onEdit}
-            className="p-1.5 border-2 border-black text-black hover:bg-[#FFE500] transition-none"
+        {/* Only show edit/delete for own memories */}
+        {isOwnMemory && (
+          <div className={`flex gap-0.5 flex-shrink-0 transition-opacity
+            ${isAnyInlineOpen ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100'}`}
           >
-            <Pencil size={11} />
-          </button>
-          <button
-            onClick={onDelete}
-            className="p-1.5 border-2 border-black text-black hover:bg-black hover:text-white transition-none"
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
+            <button
+              onClick={onEdit}
+              className="p-1.5 border-2 border-black text-black hover:bg-[#FFE500] transition-none"
+            >
+              <Pencil size={11} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-1.5 border-2 border-black text-black hover:bg-black hover:text-white transition-none"
+            >
+              <Trash2 size={11} />
+            </button>
+          </div>
+        )}
       </div>
 
       {memory.images.length > 0 && (

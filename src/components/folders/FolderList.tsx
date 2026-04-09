@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Share2, Users } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
 import { COLOR_SOLID } from '../../types'
 import type { Memory, Folder } from '../../types'
 import FolderModal from './FolderModal'
+import ShareFolderModal from './ShareFolderModal'
 import ConfirmDialog from '../ui/ConfirmDialog'
 import { differenceInDays, parseISO } from 'date-fns'
 
@@ -24,6 +25,7 @@ function FolderCard({
   onSelect,
   onEdit,
   onDelete,
+  onShare,
 }: {
   folder: Folder
   isSelected: boolean
@@ -31,10 +33,13 @@ function FolderCard({
   onSelect: () => void
   onEdit: () => void
   onDelete: () => void
+  onShare: () => void
 }) {
   const days = useDaysSince(folder.id, memories)
   const user = useAuthStore((s) => s.user)
   const solid = COLOR_SOLID[folder.color]
+  const isOwner = folder.isOwner !== false
+  const isShared = folder.isShared || false
 
   return (
     <div
@@ -76,32 +81,54 @@ function FolderCard({
           className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Share button — always visible for owners, collaborators see it to view members/leave */}
           <button
-            onClick={onEdit}
-            className="w-6 h-6 border-2 border-black bg-[#FFE500] text-black flex items-center justify-center"
+            onClick={onShare}
+            className="w-6 h-6 border-2 border-black bg-white text-black flex items-center justify-center"
             style={{ boxShadow: '2px 2px 0px #000' }}
+            title="Share"
           >
-            <Pencil size={10} />
+            <Share2 size={10} />
           </button>
-          <button
-            onClick={onDelete}
-            className="w-6 h-6 border-2 border-black bg-black text-white flex items-center justify-center"
-            style={{ boxShadow: '2px 2px 0px #000' }}
-          >
-            <Trash2 size={10} />
-          </button>
+          {isOwner && (
+            <>
+              <button
+                onClick={onEdit}
+                className="w-6 h-6 border-2 border-black bg-[#FFE500] text-black flex items-center justify-center"
+                style={{ boxShadow: '2px 2px 0px #000' }}
+              >
+                <Pencil size={10} />
+              </button>
+              <button
+                onClick={onDelete}
+                className="w-6 h-6 border-2 border-black bg-black text-white flex items-center justify-center"
+                style={{ boxShadow: '2px 2px 0px #000' }}
+              >
+                <Trash2 size={10} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Footer */}
       <div className="bg-[#FFFFE0] px-2 py-2">
         <p className="text-xs font-bold text-black truncate">{folder.name}</p>
-        {user && (
-          <div className="mt-1.5 w-5 h-5 bg-black text-[#FFE500] text-[9px] font-bold
-            flex items-center justify-center flex-shrink-0">
-            {user.name.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <div className="mt-1.5 flex items-center gap-1.5">
+          {user && (
+            <div className="w-5 h-5 bg-black text-[#FFE500] text-[9px] font-bold
+              flex items-center justify-center flex-shrink-0">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {/* Shared indicator */}
+          {(isShared || !isOwner) && (
+            <div className="flex items-center gap-0.5 text-[9px] font-bold text-gray-500 uppercase tracking-wider">
+              <Users size={9} />
+              <span>Shared</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -112,6 +139,7 @@ export default function FolderList() {
   const [showCreate, setShowCreate] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
+  const [sharingFolder, setSharingFolder] = useState<Folder | null>(null)
 
   return (
     <div className="px-3 pt-3 pb-3">
@@ -130,6 +158,7 @@ export default function FolderList() {
             onSelect={() => selectFolder(f.id)}
             onEdit={() => setEditingFolder(f)}
             onDelete={() => setDeletingFolder(f)}
+            onShare={() => setSharingFolder(f)}
           />
         ))}
 
@@ -159,6 +188,9 @@ export default function FolderList() {
           onConfirm={() => deleteFolder(deletingFolder.id)}
           onClose={() => setDeletingFolder(null)}
         />
+      )}
+      {sharingFolder && (
+        <ShareFolderModal folder={sharingFolder} onClose={() => setSharingFolder(null)} />
       )}
     </div>
   )

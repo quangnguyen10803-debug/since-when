@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
-import type { Folder, Memory, FolderColor } from '../types'
+import type { Folder, Memory, FolderColor, FolderMember, FolderInvite } from '../types'
 
 interface AppState {
   folders: Folder[]
@@ -18,16 +18,25 @@ interface AppState {
   addMemory: (folderId: string, title: string, date: string, notes: string, imageUrls: string[]) => Promise<void>
   updateMemory: (id: string, title: string, date: string, notes: string, imageUrls: string[]) => Promise<void>
   deleteMemory: (id: string) => Promise<void>
+
+  // Sharing
+  loadMembers: (folderId: string) => Promise<FolderMember[]>
+  createInvite: (folderId: string) => Promise<FolderInvite | null>
+  removeMember: (memberId: string, folderId: string) => Promise<void>
+  leaveFolder: (folderId: string) => Promise<void>
+  acceptInvite: (token: string) => Promise<{ success: boolean; folderId?: string; folderName?: string; error?: string }>
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapFolder(row: any): Folder {
+function mapFolder(row: any, role?: string): Folder {
   return {
     id: row.id,
     name: row.name,
     color: row.color as FolderColor,
     coverImage: row.cover_image_url ?? undefined,
     createdAt: row.created_at,
+    isOwner: role === 'owner',
+    isShared: role === 'collaborator',
   }
 }
 
@@ -41,6 +50,8 @@ function mapMemory(row: any): Memory {
     notes: row.notes ?? '',
     images: row.image_urls ?? [],
     createdAt: row.created_at,
+    createdByName: row.created_by_name ?? undefined,
+    userId: row.user_id ?? undefined,
   }
 }
 
@@ -55,18 +66,37 @@ export const useAppStore = create<AppState>((set) => ({
 
   loadData: async (userId) => {
     try {
+      // First get all folder memberships for this user
+      const { data: memberRows } = await supabase
+        .from('folder_members')
+        .select('folder_id, role')
+        .eq('user_id', userId)
+
+      const folderIds = (memberRows ?? []).map((r) => r.folder_id)
+      const roleMap: Record<string, string> = {}
+      for (const r of memberRows ?? []) {
+        roleMap[r.folder_id] = r.role
+      }
+
+      if (folderIds.length === 0) {
+        set({ folders: [], memories: [], selectedFolderId: null })
+        return
+      }
+
       const [foldersRes, memoriesRes] = await Promise.all([
-        supabase.from('folders').select('*').eq('user_id', userId).order('created_at'),
-        supabase.from('memories').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('folders').select('*').in('id', folderIds).order('created_at'),
+        supabase.from('memories').select('*').in('folder_id', folderIds).order('created_at'),
       ])
 
-      const folders = (foldersRes.data ?? []).map(mapFolder)
+      const folders = (foldersRes.data ?? []).map((row) => mapFolder(row, roleMap[row.id]))
       const memories = (memoriesRes.data ?? []).map(mapMemory)
-      set({
+      set((s) => ({
         folders,
         memories,
-        selectedFolderId: folders[0]?.id ?? null,
-      })
+        selectedFolderId: s.selectedFolderId && folderIds.includes(s.selectedFolderId)
+          ? s.selectedFolderId
+          : folders[0]?.id ?? null,
+      }))
     } catch (err) {
       console.error('Failed to load data:', err)
     }
@@ -86,7 +116,8 @@ export const useAppStore = create<AppState>((set) => ({
 
       if (error) console.error('Failed to add folder:', error)
       if (data && !error) {
-        const folder = mapFolder(data)
+        // The trigger auto-creates the folder_members row with role='owner'
+        const folder = mapFolder(data, 'owner')
         set((s) => ({ folders: [...s.folders, folder], selectedFolderId: folder.id }))
       }
     } catch (err) {
@@ -106,7 +137,9 @@ export const useAppStore = create<AppState>((set) => ({
       if (error) console.error('Failed to update folder:', error)
       if (data && !error) {
         set((s) => ({
-          folders: s.folders.map((f) => (f.id === id ? mapFolder(data) : f)),
+          folders: s.folders.map((f) =>
+            f.id === id ? { ...mapFolder(data, f.isOwner ? 'owner' : 'collaborator'), isOwner: f.isOwner, isShared: f.isShared } : f
+          ),
         }))
       }
     } catch (err) {
@@ -138,9 +171,12 @@ export const useAppStore = create<AppState>((set) => ({
       const user = session?.user
       if (!user) return
 
+      // Get user name for created_by_name
+      const userName = user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'User'
+
       const { data, error } = await supabase
         .from('memories')
-        .insert({ user_id: user.id, folder_id: folderId, title, date, notes, image_urls: imageUrls })
+        .insert({ user_id: user.id, folder_id: folderId, title, date, notes, image_urls: imageUrls, created_by_name: userName })
         .select()
         .single()
 
@@ -182,6 +218,141 @@ export const useAppStore = create<AppState>((set) => ({
       }
     } catch (err) {
       console.error('Failed to delete memory:', err)
+    }
+  },
+
+  // ─── Sharing actions ──────────────────────────────────────────────────
+
+  loadMembers: async (folderId) => {
+    try {
+      const { data, error } = await supabase
+        .from('folder_members')
+        .select('id, folder_id, user_id, role, created_at')
+        .eq('folder_id', folderId)
+        .order('created_at')
+
+      if (error) {
+        console.error('Failed to load members:', error)
+        return []
+      }
+
+      // Fetch profile names for all member user_ids
+      const userIds = (data ?? []).map((r) => r.user_id)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', userIds)
+
+      const nameMap: Record<string, string> = {}
+      for (const p of profiles ?? []) {
+        nameMap[p.id] = p.name
+      }
+
+      return (data ?? []).map((r) => ({
+        id: r.id,
+        folderId: r.folder_id,
+        userId: r.user_id,
+        userName: nameMap[r.user_id] ?? 'Unknown',
+        role: r.role as 'owner' | 'collaborator',
+        createdAt: r.created_at,
+      }))
+    } catch (err) {
+      console.error('Failed to load members:', err)
+      return []
+    }
+  },
+
+  createInvite: async (folderId) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return null
+
+      const { data, error } = await supabase
+        .from('folder_invites')
+        .insert({ folder_id: folderId, created_by: user.id })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Failed to create invite:', error)
+        return null
+      }
+
+      return {
+        id: data.id,
+        folderId: data.folder_id,
+        token: data.token,
+        expiresAt: data.expires_at,
+        maxUses: data.max_uses,
+        useCount: data.use_count,
+        createdAt: data.created_at,
+      }
+    } catch (err) {
+      console.error('Failed to create invite:', err)
+      return null
+    }
+  },
+
+  removeMember: async (memberId, folderId) => {
+    try {
+      const { error } = await supabase.from('folder_members').delete().eq('id', memberId)
+      if (error) console.error('Failed to remove member:', error)
+    } catch (err) {
+      console.error('Failed to remove member:', err)
+    }
+  },
+
+  leaveFolder: async (folderId) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+      if (!user) return
+
+      const { error } = await supabase
+        .from('folder_members')
+        .delete()
+        .eq('folder_id', folderId)
+        .eq('user_id', user.id)
+
+      if (error) {
+        console.error('Failed to leave folder:', error)
+        return
+      }
+
+      set((s) => {
+        const folders = s.folders.filter((f) => f.id !== folderId)
+        const memories = s.memories.filter((m) => m.folderId !== folderId)
+        const selectedFolderId =
+          s.selectedFolderId === folderId ? (folders[0]?.id ?? null) : s.selectedFolderId
+        return { folders, memories, selectedFolderId }
+      })
+    } catch (err) {
+      console.error('Failed to leave folder:', err)
+    }
+  },
+
+  acceptInvite: async (token) => {
+    try {
+      const { data, error } = await supabase.rpc('accept_invite', { invite_token: token })
+
+      if (error) {
+        console.error('Failed to accept invite:', error)
+        return { success: false, error: 'Something went wrong. Please try again.' }
+      }
+
+      if (data?.error) {
+        return { success: false, error: data.error, folderId: data.folder_id }
+      }
+
+      return {
+        success: true,
+        folderId: data.folder_id,
+        folderName: data.folder_name,
+      }
+    } catch (err) {
+      console.error('Failed to accept invite:', err)
+      return { success: false, error: 'Something went wrong. Please try again.' }
     }
   },
 }))

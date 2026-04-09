@@ -1,9 +1,13 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 
 export default function LoginPage() {
   const login = useAuthStore((s) => s.login)
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const redirect = searchParams.get('redirect')
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -15,13 +19,19 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const err = await login(email.trim(), password)
-      if (err) setError(err)
+      if (err) {
+        setError(err)
+      } else if (redirect) {
+        navigate(redirect, { replace: true })
+      }
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }
   }
+
+  const registerLink = redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FFFFF0] px-4">
@@ -78,7 +88,7 @@ export default function LoginPage() {
 
           <p className="text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
             No account?{' '}
-            <Link to="/register" className="text-black underline hover:text-gray-600">
+            <Link to={registerLink} className="text-black underline hover:text-gray-600">
               Create one
             </Link>
           </p>

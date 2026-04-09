@@ -1,14 +1,23 @@
 import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useAppStore } from './store/appStore'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import HomePage from './pages/HomePage'
+import InviteAcceptPage from './pages/InviteAcceptPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user)
-  return user ? <>{children}</> : <Navigate to="/login" replace />
+  const location = useLocation()
+
+  if (!user) {
+    // Preserve current path as redirect so user returns after login
+    const redirect = location.pathname + location.search
+    return <Navigate to={`/login?redirect=${encodeURIComponent(redirect)}`} replace />
+  }
+
+  return <>{children}</>
 }
 
 function GuestRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +41,17 @@ export default function App() {
     }
   }, [user?.id, initialized])
 
+  // Refetch data when tab becomes visible (lightweight realtime for collaboration)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && user) {
+        loadData(user.id)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [user?.id])
+
   if (!initialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -45,6 +65,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+        <Route path="/invite/:token" element={<ProtectedRoute><InviteAcceptPage /></ProtectedRoute>} />
         <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

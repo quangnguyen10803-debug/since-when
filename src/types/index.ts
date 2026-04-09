@@ -21,6 +21,8 @@ export interface Folder {
   color: FolderColor
   coverImage?: string
   createdAt: string
+  isOwner?: boolean
+  isShared?: boolean
 }
 
 export interface Memory {
@@ -30,6 +32,27 @@ export interface Memory {
   date: string // ISO date string YYYY-MM-DD
   notes: string
   images: string[]
+  createdAt: string
+  createdByName?: string
+  userId?: string
+}
+
+export interface FolderMember {
+  id: string
+  folderId: string
+  userId: string
+  userName: string
+  role: 'owner' | 'collaborator'
+  createdAt: string
+}
+
+export interface FolderInvite {
+  id: string
+  folderId: string
+  token: string
+  expiresAt: string
+  maxUses: number | null
+  useCount: number
   createdAt: string
 }
 
