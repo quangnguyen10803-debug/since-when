@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link2, Copy, Check, X, LogOut, Users } from 'lucide-react'
+import { Copy, Check, X, LogOut, Users, Link2 } from 'lucide-react'
 import Modal from '../ui/Modal'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
@@ -18,8 +18,12 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
   const [invite, setInvite] = useState<FolderInvite | null>(null)
   const [copied, setCopied] = useState(false)
   const [loadingMembers, setLoadingMembers] = useState(true)
-  const [generatingLink, setGeneratingLink] = useState(false)
+  const [loadingInvite, setLoadingInvite] = useState(false)
 
+  const isOwner = folder.isOwner !== false
+  const inviteUrl = invite ? `${window.location.origin}/invite/${invite.token}` : ''
+
+  // Load members on open
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -32,17 +36,24 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
     return () => { cancelled = true }
   }, [folder.id])
 
-  const handleGenerateLink = async () => {
-    setGeneratingLink(true)
-    const inv = await createInvite(folder.id)
-    if (inv) setInvite(inv)
-    setGeneratingLink(false)
-  }
+  // Owners: auto-fetch existing invite (get_or_create returns existing one if present)
+  useEffect(() => {
+    if (!isOwner) return
+    let cancelled = false
+    ;(async () => {
+      setLoadingInvite(true)
+      const inv = await createInvite(folder.id)
+      if (!cancelled) {
+        if (inv) setInvite(inv)
+        setLoadingInvite(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [folder.id, isOwner])
 
   const handleCopy = async () => {
-    if (!invite) return
-    const url = `${window.location.origin}/invite/${invite.token}`
-    await navigator.clipboard.writeText(url)
+    if (!inviteUrl) return
+    await navigator.clipboard.writeText(inviteUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -57,12 +68,11 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
     onClose()
   }
 
-  const isOwner = folder.isOwner !== false
-
   return (
     <Modal title={`Share "${folder.name}"`} onClose={onClose}>
       <div className="p-4 space-y-4">
-        {/* Members section */}
+
+        {/* Members */}
         <div>
           <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <Users size={11} />
@@ -70,7 +80,7 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
           </h3>
           {loadingMembers ? (
             <div className="flex items-center justify-center py-4">
-              <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-900 animate-spin" />
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 animate-spin" />
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -86,7 +96,7 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
                     <span className="text-xs font-bold text-black truncate">
                       {member.userName}
                       {member.userId === user?.id && (
-                        <span className="text-gray-500 ml-1">(you)</span>
+                        <span className="text-gray-500 font-normal ml-1">(you)</span>
                       )}
                     </span>
                   </div>
@@ -111,7 +121,7 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
           )}
         </div>
 
-        {/* Invite link section — owner only */}
+        {/* Invite link — owners only */}
         {isOwner && (
           <div>
             <h3 className="text-[10px] font-bold text-black uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -119,41 +129,42 @@ export default function ShareFolderModal({ folder, onClose }: ShareFolderModalPr
               Invite Link
             </h3>
 
-            {invite ? (
+            {loadingInvite ? (
+              <div className="flex items-center gap-2 py-1">
+                <div className="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-900 animate-spin" />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Loading link…</span>
+              </div>
+            ) : invite ? (
               <div className="space-y-2">
+                {/* Read-only URL box + copy button */}
                 <div className="flex gap-1.5">
                   <input
                     type="text"
                     readOnly
-                    value={`${window.location.origin}/invite/${invite.token}`}
+                    value={inviteUrl}
                     className="brutal-input flex-1 text-[11px] bg-white"
+                    onFocus={(e) => e.target.select()}
                   />
                   <button
                     onClick={handleCopy}
-                    className="brutal-btn-primary px-3 flex items-center gap-1"
+                    className="brutal-btn-primary px-3 flex items-center gap-1.5 flex-shrink-0"
                   >
                     {copied ? <Check size={12} /> : <Copy size={12} />}
-                    {copied ? 'Copied' : 'Copy'}
+                    {copied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <p className="text-[10px] text-gray-500 font-medium">
-                  Expires in 7 days. Anyone with this link can join.
+                  Anyone with this link can join. Expires in 7 days.
                 </p>
               </div>
             ) : (
-              <button
-                onClick={handleGenerateLink}
-                disabled={generatingLink}
-                className="brutal-btn-primary flex items-center gap-1.5 text-xs"
-              >
-                <Link2 size={12} />
-                {generatingLink ? 'Generating...' : 'Generate invite link'}
-              </button>
+              // Fallback — shouldn't normally show, but in case RPC fails
+              <p className="text-[10px] font-bold text-gray-500">Could not load invite link. Try closing and reopening.</p>
             )}
           </div>
         )}
 
-        {/* Leave folder — collaborator only */}
+        {/* Leave folder — collaborators only */}
         {!isOwner && (
           <button
             onClick={handleLeave}

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Plus, Pencil, Trash2, Share2, Users, Link2, Check } from 'lucide-react'
+import { Plus, Pencil, Trash2, Share2, Users } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
 import { COLOR_SOLID } from '../../types'
@@ -26,7 +26,6 @@ function FolderCard({
   onEdit,
   onDelete,
   onShare,
-  onCopyInvite,
 }: {
   folder: Folder
   isSelected: boolean
@@ -35,21 +34,12 @@ function FolderCard({
   onEdit: () => void
   onDelete: () => void
   onShare: () => void
-  onCopyInvite: () => void
 }) {
   const days = useDaysSince(folder.id, memories)
   const user = useAuthStore((s) => s.user)
   const solid = COLOR_SOLID[folder.color]
   const isOwner = folder.isOwner !== false
   const isShared = folder.isShared || false
-  const [copied, setCopied] = useState(false)
-
-  const handleCopyInvite = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-    onCopyInvite()
-  }
 
   return (
     <div
@@ -91,23 +81,12 @@ function FolderCard({
           className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Quick copy invite link — owners only */}
-          {isOwner && (
-            <button
-              onClick={handleCopyInvite}
-              className="w-6 h-6 border-2 border-black bg-white text-black flex items-center justify-center"
-              style={{ boxShadow: '2px 2px 0px #000' }}
-              title="Copy invite link"
-            >
-              {copied ? <Check size={10} /> : <Link2 size={10} />}
-            </button>
-          )}
-          {/* Share/members button */}
+          {/* Share button — opens modal with invite link inside */}
           <button
             onClick={(e) => { e.stopPropagation(); onShare() }}
             className="w-6 h-6 border-2 border-black bg-white text-black flex items-center justify-center"
             style={{ boxShadow: '2px 2px 0px #000' }}
-            title={isOwner ? 'Manage members' : 'View members / Leave'}
+            title={isOwner ? 'Share / invite' : 'View members / Leave'}
           >
             <Share2 size={10} />
           </button>
@@ -142,7 +121,6 @@ function FolderCard({
               {user.name.charAt(0).toUpperCase()}
             </div>
           )}
-          {/* Shared indicator */}
           {(isShared || !isOwner) && (
             <div className="flex items-center gap-0.5 text-[9px] font-bold text-gray-500 uppercase tracking-wider">
               <Users size={9} />
@@ -156,18 +134,11 @@ function FolderCard({
 }
 
 export default function FolderList() {
-  const { folders, memories, selectedFolderId, selectFolder, deleteFolder, createInvite } = useAppStore()
+  const { folders, memories, selectedFolderId, selectFolder, deleteFolder } = useAppStore()
   const [showCreate, setShowCreate] = useState(false)
   const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
   const [deletingFolder, setDeletingFolder] = useState<Folder | null>(null)
   const [sharingFolder, setSharingFolder] = useState<Folder | null>(null)
-
-  const handleCopyInvite = async (folder: Folder) => {
-    const invite = await createInvite(folder.id)
-    if (!invite) return
-    const url = `${window.location.origin}/invite/${invite.token}`
-    await navigator.clipboard.writeText(url)
-  }
 
   return (
     <div className="px-3 pt-3 pb-3">
@@ -187,7 +158,6 @@ export default function FolderList() {
             onEdit={() => setEditingFolder(f)}
             onDelete={() => setDeletingFolder(f)}
             onShare={() => setSharingFolder(f)}
-            onCopyInvite={() => handleCopyInvite(f)}
           />
         ))}
 
