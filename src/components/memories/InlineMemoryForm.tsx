@@ -1,15 +1,30 @@
-import { useState, useRef } from 'react'
-import { ImagePlus, X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ImagePlus, X, AlertCircle } from 'lucide-react'
 import { useAppStore } from '../../store/appStore'
 import { useAuthStore } from '../../store/authStore'
-import { uploadImage } from '../../lib/storage'
+import { uploadImage, validateImageFile } from '../../lib/storage'
 import type { Memory } from '../../types'
 import { format } from 'date-fns'
 
 interface InlineMemoryFormProps {
   folderId: string
-  memory?: Memory // if provided → edit mode
+  memory?: Memory
   onDone: () => void
+}
+
+interface ImageEntry {
+  url: string
+  name: string
+}
+
+interface FileError {
+  name: string
+  message: string
+}
+
+function autoResize(el: HTMLTextAreaElement) {
+  el.style.height = 'auto'
+  el.style.height = el.scrollHeight + 'px'
 }
 
 export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMemoryFormProps) {
@@ -19,32 +34,71 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
   const [title, setTitle] = useState(memory?.title ?? '')
   const [date, setDate] = useState(memory?.date ?? format(new Date(), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState(memory?.notes ?? '')
-  const [images, setImages] = useState<string[]>(memory?.images ?? [])
+  const [images, setImages] = useState<ImageEntry[]>(
+    (memory?.images ?? []).map((url) => ({ url, name: '' }))
+  )
   const [uploading, setUploading] = useState(false)
+  const [fileErrors, setFileErrors] = useState<FileError[]>([])
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const notesRef = useRef<HTMLTextAreaElement>(null)
+
+  // Resize textarea on mount (handles edit mode with existing text)
+  useEffect(() => {
+    if (notesRef.current) autoResize(notesRef.current)
+  }, [])
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || !user) return
-    const toProcess = Array.from(files).slice(0, 5 - images.length)
+    const remaining = 5 - images.length
+    const toProcess = Array.from(files).slice(0, remaining)
     if (!toProcess.length) return
+
+    // Validate each file first
+    const errors: FileError[] = []
+    const valid: File[] = []
+    for (const file of toProcess) {
+      const err = validateImageFile(file)
+      if (err) {
+        errors.push({ name: file.name, message: err })
+      } else {
+        valid.push(file)
+      }
+    }
+    setFileErrors(errors)
+    if (!valid.length) return
+
     setUploading(true)
-    const urls = await Promise.all(toProcess.map((f) => uploadImage(f, user.id)))
-    setImages((prev) => [...prev, ...(urls.filter(Boolean) as string[])])
+    const results = await Promise.all(valid.map((f) => uploadImage(f, user.id)))
+    const uploadErrors: FileError[] = []
+    const succeeded: ImageEntry[] = []
+
+    results.forEach((result, i) => {
+      if (result.error) {
+        uploadErrors.push({ name: valid[i].name, message: result.error })
+      } else {
+        succeeded.push({ url: result.url!, name: valid[i].name })
+      }
+    })
+
+    setFileErrors((prev) => [...prev, ...uploadErrors])
+    setImages((prev) => [...prev, ...succeeded])
     setUploading(false)
   }
 
   const removeImage = (idx: number) => setImages((prev) => prev.filter((_, i) => i !== idx))
+  const dismissError = (idx: number) => setFileErrors((prev) => prev.filter((_, i) => i !== idx))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
     try {
+      const urls = images.map((img) => img.url)
       if (memory) {
-        await updateMemory(memory.id, title.trim(), date, notes.trim(), images)
+        await updateMemory(memory.id, title.trim(), date, notes.trim(), urls)
       } else {
-        await addMemory(folderId, title.trim(), date, notes.trim(), images)
+        await addMemory(folderId, title.trim(), date, notes.trim(), urls)
       }
       onDone()
     } catch (err) {
@@ -57,7 +111,7 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-2 border-black p-3 bg-white space-y-3"
+      className="border-2 border-black p-3 bg-white space-y-2"
       style={{ boxShadow: '4px 4px 0px #000' }}
     >
       {/* Title + Date row */}
@@ -80,22 +134,51 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
         />
       </div>
 
-      {/* Notes */}
+      {/* Notes — borderless, canvas-like, auto-grows */}
       <textarea
-        className="brutal-input resize-none w-full"
-        rows={3}
-        placeholder="Add notes… what happened, what do you want to remember?"
+        ref={notesRef}
+        className="w-full text-sm text-black placeholder:text-gray-400 bg-transparent resize-none leading-relaxed"
+        style={{
+          border: 'none',
+          outline: 'none',
+          minHeight: 48,
+          fontFamily: 'JetBrains Mono, monospace',
+        }}
+        placeholder="Write notes… what happened, what do you want to remember?"
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
+        onChange={(e) => {
+          setNotes(e.target.value)
+          autoResize(e.target)
+        }}
       />
+
+      {/* File errors */}
+      {fileErrors.length > 0 && (
+        <div className="space-y-1">
+          {fileErrors.map((err, i) => (
+            <div
+              key={i}
+              className="flex items-start gap-2 text-[10px] font-bold bg-black text-[#FFE500] px-2 py-1.5 border-2 border-black"
+            >
+              <AlertCircle size={11} className="flex-shrink-0 mt-px" />
+              <span className="flex-1 leading-snug">
+                <span className="opacity-70">{err.name}: </span>{err.message}
+              </span>
+              <button type="button" onClick={() => dismissError(i)} className="flex-shrink-0 opacity-70 hover:opacity-100">
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Images */}
       <div>
         {images.length > 0 && (
           <div className="flex gap-2 flex-wrap mb-2">
-            {images.map((src, i) => (
+            {images.map((img, i) => (
               <div key={i} className="relative w-16 h-16 overflow-hidden group/img flex-shrink-0 border-2 border-black">
-                <img src={src} alt="" className="w-full h-full object-cover" />
+                <img src={img.url} alt="" className="w-full h-full object-cover" />
                 <button
                   type="button"
                   onClick={() => removeImage(i)}
@@ -113,7 +196,7 @@ export default function InlineMemoryForm({ folderId, memory, onDone }: InlineMem
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif,.heic,.heif"
               multiple
               className="hidden"
               onChange={(e) => handleFiles(e.target.files)}

@@ -240,7 +240,7 @@ function MemoryCard({ memory, folderColor, folderSolid, isAnyInlineOpen, isOwnMe
       )}
 
       {memory.notes && (
-        <p className="mt-2 text-xs text-gray-700 leading-relaxed line-clamp-3 border-l-2 border-black pl-2">
+        <p className="mt-2 text-xs text-gray-700 leading-relaxed border-l-2 border-black pl-2 whitespace-pre-wrap">
           {memory.notes}
         </p>
       )}

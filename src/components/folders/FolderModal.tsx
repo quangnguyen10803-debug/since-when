@@ -25,8 +25,8 @@ export default function FolderModal({ folder, onClose }: FolderModalProps) {
   const handleCoverFile = async (files: FileList | null) => {
     if (!files?.[0] || !user) return
     setUploading(true)
-    const url = await uploadImage(files[0], user.id)
-    if (url) setCoverImageUrl(url)
+    const result = await uploadImage(files[0], user.id)
+    if (result.url) setCoverImageUrl(result.url)
     setUploading(false)
   }
 
