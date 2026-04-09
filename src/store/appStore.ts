@@ -225,34 +225,19 @@ export const useAppStore = create<AppState>((set) => ({
 
   loadMembers: async (folderId) => {
     try {
-      const { data, error } = await supabase
-        .from('folder_members')
-        .select('id, folder_id, user_id, role, created_at')
-        .eq('folder_id', folderId)
-        .order('created_at')
+      const { data, error } = await supabase.rpc('get_folder_members', { p_folder_id: folderId })
 
       if (error) {
         console.error('Failed to load members:', error)
         return []
       }
 
-      // Fetch profile names for all member user_ids
-      const userIds = (data ?? []).map((r) => r.user_id)
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .in('id', userIds)
-
-      const nameMap: Record<string, string> = {}
-      for (const p of profiles ?? []) {
-        nameMap[p.id] = p.name
-      }
-
-      return (data ?? []).map((r) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data ?? []).map((r: any) => ({
         id: r.id,
         folderId: r.folder_id,
         userId: r.user_id,
-        userName: nameMap[r.user_id] ?? 'Unknown',
+        userName: r.user_name ?? 'Unknown',
         role: r.role as 'owner' | 'collaborator',
         createdAt: r.created_at,
       }))
@@ -264,18 +249,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   createInvite: async (folderId) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) return null
+      const { data, error } = await supabase.rpc('get_or_create_invite', { p_folder_id: folderId })
 
-      const { data, error } = await supabase
-        .from('folder_invites')
-        .insert({ folder_id: folderId, created_by: user.id })
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Failed to create invite:', error)
+      if (error || data?.error) {
+        console.error('Failed to create invite:', error ?? data?.error)
         return null
       }
 
